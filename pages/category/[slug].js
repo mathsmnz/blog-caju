@@ -1,16 +1,15 @@
 import React from 'react'
-import {Categories, FileCard, PostCard, PostWidget} from "../../components";
+import {Categories, FileCard, Loader, PostCard, PostWidget} from "../../components";
 import {getCategories, getFilesByCategory, getPostsByCategory} from "../../services";
+import {useRouter} from "next/router";
 
 
 const CategoryDetail = ({posts, files}) => {
-    if(!files){
-        files = []
+    const router = useRouter();
+    if (router.isFallback) {
+        return <Loader />;
     }
-    if(!posts){
-        posts = []
-    }
-    
+
     console.log(files)
     return (
         <div className="container mx-auto px-10 mb-8">
