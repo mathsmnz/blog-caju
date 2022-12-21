@@ -2,11 +2,12 @@ import {gql, request} from 'graphql-request';
 import pThrottle from 'p-throttle'
 
 const graphqlAPI = process.env.NEXT_PUBLIC_GRAPHCMS_ENDPOINT;
-const throttle = pThrottle({limit: 5, interval: 1000})
+const throttle = pThrottle({limit: 5, interval: 1050})
 
 export const throttledFetch = throttle(async (...args) => {
-    const [query, vars] = args
-    return await request(query, vars)
+    const [api, query, vars] = args
+    console.log(query, vars)
+    return await request(api, query, vars);
 })
 
 export const getPosts = async () => {
@@ -43,7 +44,7 @@ export const getPosts = async () => {
             }
         }
     `;
-    const result = await request(graphqlAPI, query);
+    const result = await throttledFetch(graphqlAPI, query);
     return result.postsConnection.edges;
 }
 
@@ -53,8 +54,8 @@ export const getFiles = async () =>{
             filesConnection {
                 edges {
                     node {
-                        createdAt
-                        description
+                        publicationYear
+                        author
                         name
                         slug
                         category {
@@ -74,7 +75,7 @@ export const getFiles = async () =>{
             }
         }
     `;
-    const result = await request(graphqlAPI, query);
+    const result = await throttledFetch(graphqlAPI, query);
     return result.postsConnection.edges;
 }
 
@@ -95,7 +96,7 @@ export const getRecentPosts = async () => {
 
         }
     `;
-    const result = await request(graphqlAPI, query);
+    const result = await throttledFetch(graphqlAPI, query);
     return result.posts;
 }
 
@@ -115,7 +116,7 @@ export const getSimilarPosts = async (subCategories, slug) => {
             }
         }
     `;
-    const result = await request(graphqlAPI, query, {slug, subCategories});
+    const result = await throttledFetch(graphqlAPI, query, {slug, subCategories});
 
     return result.posts;
 };
@@ -128,13 +129,12 @@ export const getSimilarFiles = async (subCategories, slug) =>{
                 last: 3
             ){
                 name
-                createdAt
+                publicationYear
                 slug
             }
         }
     `;
-    const result = await request(graphqlAPI, query, {slug, subCategories});
-
+    const result = await throttledFetch(graphqlAPI, query, {slug, subCategories});
     return result.files;
 }
 
@@ -172,7 +172,7 @@ export const getPostsByCategory = async (category) =>{
         }
     `;
 
-    const result = await request(graphqlAPI, query, {category});
+    const result = await throttledFetch(graphqlAPI, query, {category});
     return result.posts;
 }
 
@@ -184,9 +184,9 @@ export const getFilesByCategory = async (category) =>{
                 last:3
             ){
                 name
-                createdAt
+                publicationYear
                 slug
-                description
+                author
                 mirrorUrl
                 libraryFile {
                     url
@@ -194,7 +194,7 @@ export const getFilesByCategory = async (category) =>{
             }
         }
     `;
-    const result = await request(graphqlAPI, query, {category});
+    const result = await throttledFetch(graphqlAPI, query, {category});
     return result.files;
 }
 
@@ -208,8 +208,7 @@ export const getCategories = async () => {
         }
     `;
 
-    const result = await request(graphqlAPI, query);
-
+    const result = await throttledFetch(graphqlAPI, query);
     return result.categories;
 };
 
@@ -247,7 +246,7 @@ export const getPostDetails = async (slug) => {
 
         }
     `;
-    const result = await request(graphqlAPI, query, {slug});
+    const result = await throttledFetch(graphqlAPI, query, {slug});
     return result.post;
 }
 
@@ -274,7 +273,6 @@ export const getComments = async (slug) => {
         }
     `;
 
-    const result = await request(graphqlAPI, query, {slug});
-
+    const result = await throttledFetch(graphqlAPI, query, {slug});
     return result.comments;
 };

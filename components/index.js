@@ -10,4 +10,5 @@ export {default as CommentsForm} from './CommentsForm';
 export {default as Comments} from './Comments';
 export {default as PostDetail} from './PostDetail';
 export {default as FileCard} from './FileCard';
-export { default as Loader } from './Loader';
+export {default as Loader} from './Loader';
+export {default as Footer} from './Footer'

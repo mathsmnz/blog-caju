@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {submitComment} from "../services";
 
 const CommentsForm = ({ slug }) => {
@@ -49,14 +49,14 @@ const CommentsForm = ({ slug }) => {
     }
 
     return (
-        <div className="bg-white shadow-lg rounded-lg p-8 pb-12 mb-8">
+        <div className="rounded-lg bg-white  p-8 pb-12 mb-8">
             <h3 className="text-xl mb-8 font-semibold border-b pb-4">
                 Comment Form
             </h3>
-            <div className="grid grid-cols-1 gap-4 mb-4">
+            <div className="grid grid-cols-1 gap-4 mb-4 rounded-md">
                 <textarea
                     ref={commentEl}
-                    className="p-4 outline-none w-full rounded-lg focus:ring-2 focus:ring-gray-200 bg-gray-100 text-gray-700"
+                    className="p-4 outline-none w-full rounded-lg focus:ring-2 focus:ring-gray-200 bg-surface text-gray-700"
                     placeholder="Comment"
                     name="comment"
                 />
@@ -65,14 +65,14 @@ const CommentsForm = ({ slug }) => {
                 <input
                     type="text"
                     ref={nameEl}
-                    className="p-2 px-4 outline-none w-full rounded-lg focus:ring-2 focus:ring-gray-200 bg-gray-100 text-gray-700"
+                    className="p-2 px-4 outline-none w-full rounded-lg focus:ring-2 focus:ring-gray-200 bg-surface text-gray-700"
                     placeholder="Name"
                     name="name"
                 />
                 <input
                     type="text"
                     ref={emailEl}
-                    className="p-2 px-4 outline-none w-full rounded-lg focus:ring-2 focus:ring-gray-200 bg-gray-100 text-gray-700"
+                    className="p-2 px-4 outline-none w-full rounded-lg focus:ring-2 focus:ring-gray-200 bg-surface text-gray-700"
                     placeholder="Email"
                     name="email"
                 />
@@ -87,7 +87,7 @@ const CommentsForm = ({ slug }) => {
             <div className="mt-8">
                 <button type="button"
                         onClick={handleCommentSubmission}
-                        className="transition duration-500 ease rounded hover:bg-indigo-900 inline-block bg-pink-600 text-lg text-white px-8 py-3 cursor-pointer">
+                        className="transition duration-500 ease rounded hover:bg-indigo-900 inline-block bg-onContainer text-lg px-8 py-3 cursor-pointer">
                     Post comment
                 </button>
                 {showSuccessMessage && <span className="text-xl float-right font-semibold mt-3 text-green-500">Comment submitted to review</span>}

@@ -13,7 +13,7 @@ interface Node {
     stage: Stage!
 }
 
-union ScheduledOperationAffectedDocument = Asset | Author | Category | Comment | File | Post | Section | SubCategory
+union ScheduledOperationAffectedDocument = Asset | Author | Category | Comment | File | Post | SubCategory
 
 type Aggregate {
     count: Int!
@@ -524,6 +524,7 @@ type BatchPayload {
     count: Long!
 }
 
+"Categoria divide o conteúdo do site de acordo com o que aquilo é principalmente, um artigo, um post, uma notícia ou um arquivo"
 type Category implements Node {
     "The time the document was created"
     createdAt: DateTime!
@@ -911,6 +912,8 @@ type DocumentVersion {
 }
 
 type File implements Node {
+    accessCount: Int!
+    author: String!
     category(
         """
 
@@ -999,8 +1002,9 @@ type File implements Node {
         """
         locales: [Locale!]
     ): Asset
-    mirrorUrl: String
+    mirrorUrl: String!
     name: String!
+    publicationYear: Int!
     "The time the document was published. Null on documents in draft stage."
     publishedAt: DateTime
     "User that last published this document"
@@ -1054,28 +1058,6 @@ type File implements Node {
         skip: Int,
         where: ScheduledOperationWhereInput
     ): [ScheduledOperation!]!
-    section(
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `section` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `section` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!]
-    ): Section
     slug: String!
     "System stage field"
     stage: Stage!
@@ -1174,8 +1156,6 @@ type Mutation {
     createPost(data: PostCreateInput!): Post
     "Create one scheduledRelease"
     createScheduledRelease(data: ScheduledReleaseCreateInput!): ScheduledRelease
-    "Create one section"
-    createSection(data: SectionCreateInput!): Section
     "Create one subCategory"
     createSubCategory(data: SubCategoryCreateInput!): SubCategory
     "Delete one asset from _all_ existing stages. Returns deleted document."
@@ -1293,21 +1273,6 @@ type Mutation {
         "Documents to delete"
         where: PostManyWhereInput
     ): PostConnection!
-    "Delete many Section documents"
-    deleteManySections(
-        "Documents to delete"
-        where: SectionManyWhereInput
-    ): BatchPayload! @deprecated(reason: "Please use the new paginated many mutation (deleteManySectionsConnection)")
-    "Delete many Section documents, return deleted documents"
-    deleteManySectionsConnection(
-        after: ID,
-        before: ID,
-        first: Int,
-        last: Int,
-        skip: Int,
-        "Documents to delete"
-        where: SectionManyWhereInput
-    ): SectionConnection!
     "Delete many SubCategory documents"
     deleteManySubCategories(
         "Documents to delete"
@@ -1338,11 +1303,6 @@ type Mutation {
         "Document to delete"
         where: ScheduledReleaseWhereUniqueInput!
     ): ScheduledRelease
-    "Delete one section from _all_ existing stages. Returns deleted document."
-    deleteSection(
-        "Document to delete"
-        where: SectionWhereUniqueInput!
-    ): Section
     "Delete one subCategory from _all_ existing stages. Returns deleted document."
     deleteSubCategory(
         "Document to delete"
@@ -1545,27 +1505,6 @@ type Mutation {
         "Identifies documents in each stage to be published"
         where: PostManyWhereInput
     ): PostConnection!
-    "Publish many Section documents"
-    publishManySections(
-        "Stages to publish documents to"
-        to: [Stage!]! = [PUBLISHED],
-        "Identifies documents in each stage to be published"
-        where: SectionManyWhereInput
-    ): BatchPayload! @deprecated(reason: "Please use the new paginated many mutation (publishManySectionsConnection)")
-    "Publish many Section documents"
-    publishManySectionsConnection(
-        after: ID,
-        before: ID,
-        first: Int,
-        "Stage to find matching documents in"
-        from: Stage = DRAFT,
-        last: Int,
-        skip: Int,
-        "Stages to publish documents to"
-        to: [Stage!]! = [PUBLISHED],
-        "Identifies documents in each stage to be published"
-        where: SectionManyWhereInput
-    ): SectionConnection!
     "Publish many SubCategory documents"
     publishManySubCategories(
         "Stages to publish documents to"
@@ -1594,13 +1533,6 @@ type Mutation {
         "Document to publish"
         where: PostWhereUniqueInput!
     ): Post
-    "Publish one section"
-    publishSection(
-        "Publishing target stage"
-        to: [Stage!]! = [PUBLISHED],
-        "Document to publish"
-        where: SectionWhereUniqueInput!
-    ): Section
     "Publish one subCategory"
     publishSubCategory(
         "Publishing target stage"
@@ -1686,17 +1618,6 @@ type Mutation {
         "Document to publish"
         where: PostWhereUniqueInput!
     ): Post
-    "Schedule to publish one section"
-    schedulePublishSection(
-        "Release at point in time, will create new release containing this operation"
-        releaseAt: DateTime,
-        "Optionally attach this scheduled operation to an existing release"
-        releaseId: String,
-        "Publishing target stage"
-        to: [Stage!]! = [PUBLISHED],
-        "Document to publish"
-        where: SectionWhereUniqueInput!
-    ): Section
     "Schedule to publish one subCategory"
     schedulePublishSubCategory(
         "Release at point in time, will create new release containing this operation"
@@ -1782,17 +1703,6 @@ type Mutation {
         "Document to unpublish"
         where: PostWhereUniqueInput!
     ): Post
-    "Unpublish one section from selected stages. Unpublish either the complete document with its relations, localizations and base data or specific localizations only."
-    scheduleUnpublishSection(
-        "Stages to unpublish document from"
-        from: [Stage!]! = [PUBLISHED],
-        "Release at point in time, will create new release containing this operation"
-        releaseAt: DateTime,
-        "Optionally attach this scheduled operation to an existing release"
-        releaseId: String,
-        "Document to unpublish"
-        where: SectionWhereUniqueInput!
-    ): Section
     "Unpublish one subCategory from selected stages. Unpublish either the complete document with its relations, localizations and base data or specific localizations only."
     scheduleUnpublishSubCategory(
         "Stages to unpublish document from"
@@ -1989,27 +1899,6 @@ type Mutation {
         "Identifies documents in draft stage"
         where: PostManyWhereInput
     ): PostConnection!
-    "Unpublish many Section documents"
-    unpublishManySections(
-        "Stages to unpublish documents from"
-        from: [Stage!]! = [PUBLISHED],
-        "Identifies documents in each stage"
-        where: SectionManyWhereInput
-    ): BatchPayload! @deprecated(reason: "Please use the new paginated many mutation (unpublishManySectionsConnection)")
-    "Find many Section documents that match criteria in specified stage and unpublish from target stages"
-    unpublishManySectionsConnection(
-        after: ID,
-        before: ID,
-        first: Int,
-        "Stages to unpublish documents from"
-        from: [Stage!]! = [PUBLISHED],
-        last: Int,
-        skip: Int,
-        "Stage to find matching documents in"
-        stage: Stage = DRAFT,
-        "Identifies documents in draft stage"
-        where: SectionManyWhereInput
-    ): SectionConnection!
     "Unpublish many SubCategory documents"
     unpublishManySubCategories(
         "Stages to unpublish documents from"
@@ -2038,13 +1927,6 @@ type Mutation {
         "Document to unpublish"
         where: PostWhereUniqueInput!
     ): Post
-    "Unpublish one section from selected stages. Unpublish either the complete document with its relations, localizations and base data or specific localizations only."
-    unpublishSection(
-        "Stages to unpublish document from"
-        from: [Stage!]! = [PUBLISHED],
-        "Document to unpublish"
-        where: SectionWhereUniqueInput!
-    ): Section
     "Unpublish one subCategory from selected stages. Unpublish either the complete document with its relations, localizations and base data or specific localizations only."
     unpublishSubCategory(
         "Stages to unpublish document from"
@@ -2176,25 +2058,6 @@ type Mutation {
         "Documents to apply update on"
         where: PostManyWhereInput
     ): PostConnection!
-    "Update many sections"
-    updateManySections(
-        "Updates to document content"
-        data: SectionUpdateManyInput!,
-        "Documents to apply update on"
-        where: SectionManyWhereInput
-    ): BatchPayload! @deprecated(reason: "Please use the new paginated many mutation (updateManySectionsConnection)")
-    "Update many Section documents"
-    updateManySectionsConnection(
-        after: ID,
-        before: ID,
-        "Updates to document content"
-        data: SectionUpdateManyInput!,
-        first: Int,
-        last: Int,
-        skip: Int,
-        "Documents to apply update on"
-        where: SectionManyWhereInput
-    ): SectionConnection!
     "Update many subCategories"
     updateManySubCategories(
         "Updates to document content"
@@ -2218,8 +2081,6 @@ type Mutation {
     updatePost(data: PostUpdateInput!, where: PostWhereUniqueInput!): Post
     "Update one scheduledRelease"
     updateScheduledRelease(data: ScheduledReleaseUpdateInput!, where: ScheduledReleaseWhereUniqueInput!): ScheduledRelease
-    "Update one section"
-    updateSection(data: SectionUpdateInput!, where: SectionWhereUniqueInput!): Section
     "Update one subCategory"
     updateSubCategory(data: SubCategoryUpdateInput!, where: SubCategoryWhereUniqueInput!): SubCategory
     "Upsert one asset"
@@ -2234,8 +2095,6 @@ type Mutation {
     upsertFile(upsert: FileUpsertInput!, where: FileWhereUniqueInput!): File
     "Upsert one post"
     upsertPost(upsert: PostUpsertInput!, where: PostWhereUniqueInput!): Post
-    "Upsert one section"
-    upsertSection(upsert: SectionUpsertInput!, where: SectionWhereUniqueInput!): Section
     "Upsert one subCategory"
     upsertSubCategory(upsert: SubCategoryUpsertInput!, where: SubCategoryWhereUniqueInput!): SubCategory
 }
@@ -2449,28 +2308,6 @@ type Post implements Node {
         skip: Int,
         where: ScheduledOperationWhereInput
     ): [ScheduledOperation!]!
-    section(
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `section` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `section` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!]
-    ): Section
     slug: String!
     "System stage field"
     stage: Stage!
@@ -3033,65 +2870,6 @@ type Query {
         stage: Stage! = PUBLISHED,
         where: ScheduledReleaseWhereInput
     ): ScheduledReleaseConnection!
-    "Retrieve a single section"
-    section(
-        """
-
-        Defines which locales should be returned.
-
-        Note that `Section` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument may be overwritten by another locales definition in a relational child field, this will effectively use the overwritten argument for the affected query's subtree.
-        """
-        locales: [Locale!]! = [en],
-        stage: Stage! = PUBLISHED,
-        where: SectionWhereUniqueInput!
-    ): Section
-    "Retrieve document version"
-    sectionVersion(where: VersionWhereInput!): DocumentVersion
-    "Retrieve multiple sections"
-    sections(
-        after: String,
-        before: String,
-        first: Int,
-        last: Int,
-        """
-
-        Defines which locales should be returned.
-
-        Note that `Section` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument may be overwritten by another locales definition in a relational child field, this will effectively use the overwritten argument for the affected query's subtree.
-        """
-        locales: [Locale!]! = [en],
-        orderBy: SectionOrderByInput,
-        skip: Int,
-        stage: Stage! = PUBLISHED,
-        where: SectionWhereInput
-    ): [Section!]!
-    "Retrieve multiple sections using the Relay connection interface"
-    sectionsConnection(
-        after: String,
-        before: String,
-        first: Int,
-        last: Int,
-        """
-
-        Defines which locales should be returned.
-
-        Note that `Section` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument may be overwritten by another locales definition in a relational child field, this will effectively use the overwritten argument for the affected query's subtree.
-        """
-        locales: [Locale!]! = [en],
-        orderBy: SectionOrderByInput,
-        skip: Int,
-        stage: Stage! = PUBLISHED,
-        where: SectionWhereInput
-    ): SectionConnection!
     "Retrieve multiple subCategories"
     subCategories(
         after: String,
@@ -3550,209 +3328,6 @@ type ScheduledReleaseEdge {
     node: ScheduledRelease!
 }
 
-type Section implements Node {
-    "The time the document was created"
-    createdAt: DateTime!
-    "User that created this document"
-    createdBy(
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `createdBy` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `createdBy` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!]
-    ): User
-    "Get the document in other stages"
-    documentInStages(
-        "Decides if the current stage should be included or not"
-        includeCurrent: Boolean! = false,
-        "Decides if the documents should match the parent documents locale or should use the fallback order defined in the tree"
-        inheritLocale: Boolean! = false,
-        "Potential stages that should be returned"
-        stages: [Stage!]! = [DRAFT, PUBLISHED]
-    ): [Section!]!
-    files(
-        after: String,
-        before: String,
-        first: Int,
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `files` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        last: Int,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `files` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!],
-        orderBy: FileOrderByInput,
-        skip: Int,
-        where: FileWhereInput
-    ): [File!]!
-    "List of Section versions"
-    history(
-        limit: Int! = 10,
-        skip: Int! = 0,
-        "This is optional and can be used to fetch the document version history for a specific stage instead of the current one"
-        stageOverride: Stage
-    ): [Version!]!
-    "The unique identifier"
-    id: ID!
-    name: String!
-    posts(
-        after: String,
-        before: String,
-        first: Int,
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `posts` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        last: Int,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `posts` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!],
-        orderBy: PostOrderByInput,
-        skip: Int,
-        where: PostWhereInput
-    ): [Post!]!
-    "The time the document was published. Null on documents in draft stage."
-    publishedAt: DateTime
-    "User that last published this document"
-    publishedBy(
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `publishedBy` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `publishedBy` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!]
-    ): User
-    scheduledIn(
-        after: String,
-        before: String,
-        first: Int,
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `scheduledIn` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        last: Int,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `scheduledIn` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!],
-        skip: Int,
-        where: ScheduledOperationWhereInput
-    ): [ScheduledOperation!]!
-    slug: String!
-    "System stage field"
-    stage: Stage!
-    "The time the document was updated"
-    updatedAt: DateTime!
-    "User that last updated this document"
-    updatedBy(
-        """
-
-        Sets the locale of the resolved parent document as the only locale in the query's subtree.
-
-        Note that `updatedBy` is a model without localized fields and will not be affected directly by this argument, however the locale will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will affect any existing locale filtering defined in the query's tree for the subtree.
-        """
-        forceParentLocale: Boolean,
-        """
-
-        Allows to optionally override locale filtering behaviour in the query's subtree.
-
-        Note that `updatedBy` is a model without localized fields and will not be affected directly by this argument, however the locales will be passed on to any relational fields in the query's subtree for filtering.
-        For related models with localized fields in the query's subtree, the first locale matching the provided list of locales will be returned, entries with non matching locales will be filtered out.
-
-        This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
-        """
-        locales: [Locale!]
-    ): User
-}
-
-"A connection to a list of items."
-type SectionConnection {
-    aggregate: Aggregate!
-    "A list of edges."
-    edges: [SectionEdge!]!
-    "Information to aid in pagination."
-    pageInfo: PageInfo!
-}
-
-"An edge in a connection."
-type SectionEdge {
-    "A cursor for use in pagination."
-    cursor: String!
-    "The item at the end of the edge."
-    node: Section!
-}
-
 type SubCategory implements Node {
     "The time the document was created"
     createdAt: DateTime!
@@ -4103,6 +3678,10 @@ enum DocumentFileTypes {
 }
 
 enum FileOrderByInput {
+    accessCount_ASC
+    accessCount_DESC
+    author_ASC
+    author_DESC
     createdAt_ASC
     createdAt_DESC
     description_ASC
@@ -4113,6 +3692,8 @@ enum FileOrderByInput {
     mirrorUrl_DESC
     name_ASC
     name_DESC
+    publicationYear_ASC
+    publicationYear_DESC
     publishedAt_ASC
     publishedAt_DESC
     slug_ASC
@@ -4214,21 +3795,6 @@ enum ScheduledReleaseStatus {
     FAILED
     IN_PROGRESS
     PENDING
-}
-
-enum SectionOrderByInput {
-    createdAt_ASC
-    createdAt_DESC
-    id_ASC
-    id_DESC
-    name_ASC
-    name_DESC
-    publishedAt_ASC
-    publishedAt_DESC
-    slug_ASC
-    slug_DESC
-    updatedAt_ASC
-    updatedAt_DESC
 }
 
 "Stage system enumeration"
@@ -6219,13 +5785,15 @@ input FileConnectInput {
 }
 
 input FileCreateInput {
+    accessCount: Int!
+    author: String!
     category: CategoryCreateOneInlineInput
     createdAt: DateTime
     description: String!
     libraryFile: AssetCreateOneInlineInput
-    mirrorUrl: String
+    mirrorUrl: String!
     name: String!
-    section: SectionCreateOneInlineInput
+    publicationYear: Int!
     slug: String!
     subCategories: SubCategoryCreateManyInlineInput
     updatedAt: DateTime
@@ -6255,6 +5823,40 @@ input FileManyWhereInput {
     OR: [FileWhereInput!]
     "Contains search across all appropriate fields."
     _search: String
+    accessCount: Int
+    "All values greater than the given value."
+    accessCount_gt: Int
+    "All values greater than or equal the given value."
+    accessCount_gte: Int
+    "All values that are contained in given list."
+    accessCount_in: [Int]
+    "All values less than the given value."
+    accessCount_lt: Int
+    "All values less than or equal the given value."
+    accessCount_lte: Int
+    "All values that are not equal to given value."
+    accessCount_not: Int
+    "All values that are not contained in given list."
+    accessCount_not_in: [Int]
+    author: String
+    "All values containing the given string."
+    author_contains: String
+    "All values ending with the given string."
+    author_ends_with: String
+    "All values that are contained in given list."
+    author_in: [String]
+    "All values that are not equal to given value."
+    author_not: String
+    "All values not containing the given string."
+    author_not_contains: String
+    "All values not ending with the given string"
+    author_not_ends_with: String
+    "All values that are not contained in given list."
+    author_not_in: [String]
+    "All values not starting with the given string."
+    author_not_starts_with: String
+    "All values starting with the given string."
+    author_starts_with: String
     category: CategoryWhereInput
     createdAt: DateTime
     "All values greater than the given value."
@@ -6352,6 +5954,21 @@ input FileManyWhereInput {
     name_not_starts_with: String
     "All values starting with the given string."
     name_starts_with: String
+    publicationYear: Int
+    "All values greater than the given value."
+    publicationYear_gt: Int
+    "All values greater than or equal the given value."
+    publicationYear_gte: Int
+    "All values that are contained in given list."
+    publicationYear_in: [Int]
+    "All values less than the given value."
+    publicationYear_lt: Int
+    "All values less than or equal the given value."
+    publicationYear_lte: Int
+    "All values that are not equal to given value."
+    publicationYear_not: Int
+    "All values that are not contained in given list."
+    publicationYear_not_in: [Int]
     publishedAt: DateTime
     "All values greater than the given value."
     publishedAt_gt: DateTime
@@ -6371,7 +5988,6 @@ input FileManyWhereInput {
     scheduledIn_every: ScheduledOperationWhereInput
     scheduledIn_none: ScheduledOperationWhereInput
     scheduledIn_some: ScheduledOperationWhereInput
-    section: SectionWhereInput
     slug: String
     "All values containing the given string."
     slug_contains: String
@@ -6413,12 +6029,14 @@ input FileManyWhereInput {
 }
 
 input FileUpdateInput {
+    accessCount: Int
+    author: String
     category: CategoryUpdateOneInlineInput
     description: String
     libraryFile: AssetUpdateOneInlineInput
     mirrorUrl: String
     name: String
-    section: SectionUpdateOneInlineInput
+    publicationYear: Int
     slug: String
     subCategories: SubCategoryUpdateManyInlineInput
 }
@@ -6441,9 +6059,12 @@ input FileUpdateManyInlineInput {
 }
 
 input FileUpdateManyInput {
+    accessCount: Int
+    author: String
     description: String
     mirrorUrl: String
     name: String
+    publicationYear: Int
 }
 
 input FileUpdateManyWithNestedWhereInput {
@@ -6505,6 +6126,40 @@ input FileWhereInput {
     OR: [FileWhereInput!]
     "Contains search across all appropriate fields."
     _search: String
+    accessCount: Int
+    "All values greater than the given value."
+    accessCount_gt: Int
+    "All values greater than or equal the given value."
+    accessCount_gte: Int
+    "All values that are contained in given list."
+    accessCount_in: [Int]
+    "All values less than the given value."
+    accessCount_lt: Int
+    "All values less than or equal the given value."
+    accessCount_lte: Int
+    "All values that are not equal to given value."
+    accessCount_not: Int
+    "All values that are not contained in given list."
+    accessCount_not_in: [Int]
+    author: String
+    "All values containing the given string."
+    author_contains: String
+    "All values ending with the given string."
+    author_ends_with: String
+    "All values that are contained in given list."
+    author_in: [String]
+    "All values that are not equal to given value."
+    author_not: String
+    "All values not containing the given string."
+    author_not_contains: String
+    "All values not ending with the given string"
+    author_not_ends_with: String
+    "All values that are not contained in given list."
+    author_not_in: [String]
+    "All values not starting with the given string."
+    author_not_starts_with: String
+    "All values starting with the given string."
+    author_starts_with: String
     category: CategoryWhereInput
     createdAt: DateTime
     "All values greater than the given value."
@@ -6602,6 +6257,21 @@ input FileWhereInput {
     name_not_starts_with: String
     "All values starting with the given string."
     name_starts_with: String
+    publicationYear: Int
+    "All values greater than the given value."
+    publicationYear_gt: Int
+    "All values greater than or equal the given value."
+    publicationYear_gte: Int
+    "All values that are contained in given list."
+    publicationYear_in: [Int]
+    "All values less than the given value."
+    publicationYear_lt: Int
+    "All values less than or equal the given value."
+    publicationYear_lte: Int
+    "All values that are not equal to given value."
+    publicationYear_not: Int
+    "All values that are not contained in given list."
+    publicationYear_not_in: [Int]
     publishedAt: DateTime
     "All values greater than the given value."
     publishedAt_gt: DateTime
@@ -6621,7 +6291,6 @@ input FileWhereInput {
     scheduledIn_every: ScheduledOperationWhereInput
     scheduledIn_none: ScheduledOperationWhereInput
     scheduledIn_some: ScheduledOperationWhereInput
-    section: SectionWhereInput
     slug: String
     "All values containing the given string."
     slug_contains: String
@@ -6719,7 +6388,6 @@ input PostCreateInput {
     excerpt: String!
     featuredImage: AssetCreateOneInlineInput!
     featuredPost: Boolean!
-    section: SectionCreateOneInlineInput
     slug: String!
     subCategories: SubCategoryCreateManyInlineInput
     title: String!
@@ -6835,7 +6503,6 @@ input PostManyWhereInput {
     scheduledIn_every: ScheduledOperationWhereInput
     scheduledIn_none: ScheduledOperationWhereInput
     scheduledIn_some: ScheduledOperationWhereInput
-    section: SectionWhereInput
     slug: String
     "All values containing the given string."
     slug_contains: String
@@ -6903,7 +6570,6 @@ input PostUpdateInput {
     excerpt: String
     featuredImage: AssetUpdateOneInlineInput
     featuredPost: Boolean
-    section: SectionUpdateOneInlineInput
     slug: String
     subCategories: SubCategoryUpdateManyInlineInput
     title: String
@@ -7077,7 +6743,6 @@ input PostWhereInput {
     scheduledIn_every: ScheduledOperationWhereInput
     scheduledIn_none: ScheduledOperationWhereInput
     scheduledIn_some: ScheduledOperationWhereInput
-    section: SectionWhereInput
     slug: String
     "All values containing the given string."
     slug_contains: String
@@ -7904,391 +7569,6 @@ input ScheduledReleaseWhereInput {
 "References ScheduledRelease record uniquely"
 input ScheduledReleaseWhereUniqueInput {
     id: ID
-}
-
-input SectionConnectInput {
-    "Allow to specify document position in list of connected documents, will default to appending at end of list"
-    position: ConnectPositionInput
-    "Document to connect"
-    where: SectionWhereUniqueInput!
-}
-
-input SectionCreateInput {
-    createdAt: DateTime
-    files: FileCreateManyInlineInput
-    name: String!
-    posts: PostCreateManyInlineInput
-    slug: String!
-    updatedAt: DateTime
-}
-
-input SectionCreateManyInlineInput {
-    "Connect multiple existing Section documents"
-    connect: [SectionWhereUniqueInput!]
-    "Create and connect multiple existing Section documents"
-    create: [SectionCreateInput!]
-}
-
-input SectionCreateOneInlineInput {
-    "Connect one existing Section document"
-    connect: SectionWhereUniqueInput
-    "Create and connect one Section document"
-    create: SectionCreateInput
-}
-
-"Identifies documents"
-input SectionManyWhereInput {
-    "Logical AND on all given filters."
-    AND: [SectionWhereInput!]
-    "Logical NOT on all given filters combined by AND."
-    NOT: [SectionWhereInput!]
-    "Logical OR on all given filters."
-    OR: [SectionWhereInput!]
-    "Contains search across all appropriate fields."
-    _search: String
-    createdAt: DateTime
-    "All values greater than the given value."
-    createdAt_gt: DateTime
-    "All values greater than or equal the given value."
-    createdAt_gte: DateTime
-    "All values that are contained in given list."
-    createdAt_in: [DateTime]
-    "All values less than the given value."
-    createdAt_lt: DateTime
-    "All values less than or equal the given value."
-    createdAt_lte: DateTime
-    "All values that are not equal to given value."
-    createdAt_not: DateTime
-    "All values that are not contained in given list."
-    createdAt_not_in: [DateTime]
-    createdBy: UserWhereInput
-    documentInStages_every: SectionWhereStageInput
-    documentInStages_none: SectionWhereStageInput
-    documentInStages_some: SectionWhereStageInput
-    files_every: FileWhereInput
-    files_none: FileWhereInput
-    files_some: FileWhereInput
-    id: ID
-    "All values containing the given string."
-    id_contains: ID
-    "All values ending with the given string."
-    id_ends_with: ID
-    "All values that are contained in given list."
-    id_in: [ID]
-    "All values that are not equal to given value."
-    id_not: ID
-    "All values not containing the given string."
-    id_not_contains: ID
-    "All values not ending with the given string"
-    id_not_ends_with: ID
-    "All values that are not contained in given list."
-    id_not_in: [ID]
-    "All values not starting with the given string."
-    id_not_starts_with: ID
-    "All values starting with the given string."
-    id_starts_with: ID
-    name: String
-    "All values containing the given string."
-    name_contains: String
-    "All values ending with the given string."
-    name_ends_with: String
-    "All values that are contained in given list."
-    name_in: [String]
-    "All values that are not equal to given value."
-    name_not: String
-    "All values not containing the given string."
-    name_not_contains: String
-    "All values not ending with the given string"
-    name_not_ends_with: String
-    "All values that are not contained in given list."
-    name_not_in: [String]
-    "All values not starting with the given string."
-    name_not_starts_with: String
-    "All values starting with the given string."
-    name_starts_with: String
-    posts_every: PostWhereInput
-    posts_none: PostWhereInput
-    posts_some: PostWhereInput
-    publishedAt: DateTime
-    "All values greater than the given value."
-    publishedAt_gt: DateTime
-    "All values greater than or equal the given value."
-    publishedAt_gte: DateTime
-    "All values that are contained in given list."
-    publishedAt_in: [DateTime]
-    "All values less than the given value."
-    publishedAt_lt: DateTime
-    "All values less than or equal the given value."
-    publishedAt_lte: DateTime
-    "All values that are not equal to given value."
-    publishedAt_not: DateTime
-    "All values that are not contained in given list."
-    publishedAt_not_in: [DateTime]
-    publishedBy: UserWhereInput
-    scheduledIn_every: ScheduledOperationWhereInput
-    scheduledIn_none: ScheduledOperationWhereInput
-    scheduledIn_some: ScheduledOperationWhereInput
-    slug: String
-    "All values containing the given string."
-    slug_contains: String
-    "All values ending with the given string."
-    slug_ends_with: String
-    "All values that are contained in given list."
-    slug_in: [String]
-    "All values that are not equal to given value."
-    slug_not: String
-    "All values not containing the given string."
-    slug_not_contains: String
-    "All values not ending with the given string"
-    slug_not_ends_with: String
-    "All values that are not contained in given list."
-    slug_not_in: [String]
-    "All values not starting with the given string."
-    slug_not_starts_with: String
-    "All values starting with the given string."
-    slug_starts_with: String
-    updatedAt: DateTime
-    "All values greater than the given value."
-    updatedAt_gt: DateTime
-    "All values greater than or equal the given value."
-    updatedAt_gte: DateTime
-    "All values that are contained in given list."
-    updatedAt_in: [DateTime]
-    "All values less than the given value."
-    updatedAt_lt: DateTime
-    "All values less than or equal the given value."
-    updatedAt_lte: DateTime
-    "All values that are not equal to given value."
-    updatedAt_not: DateTime
-    "All values that are not contained in given list."
-    updatedAt_not_in: [DateTime]
-    updatedBy: UserWhereInput
-}
-
-input SectionUpdateInput {
-    files: FileUpdateManyInlineInput
-    name: String
-    posts: PostUpdateManyInlineInput
-    slug: String
-}
-
-input SectionUpdateManyInlineInput {
-    "Connect multiple existing Section documents"
-    connect: [SectionConnectInput!]
-    "Create and connect multiple Section documents"
-    create: [SectionCreateInput!]
-    "Delete multiple Section documents"
-    delete: [SectionWhereUniqueInput!]
-    "Disconnect multiple Section documents"
-    disconnect: [SectionWhereUniqueInput!]
-    "Override currently-connected documents with multiple existing Section documents"
-    set: [SectionWhereUniqueInput!]
-    "Update multiple Section documents"
-    update: [SectionUpdateWithNestedWhereUniqueInput!]
-    "Upsert multiple Section documents"
-    upsert: [SectionUpsertWithNestedWhereUniqueInput!]
-}
-
-input SectionUpdateManyInput {
-    name: String
-}
-
-input SectionUpdateManyWithNestedWhereInput {
-    "Update many input"
-    data: SectionUpdateManyInput!
-    "Document search"
-    where: SectionWhereInput!
-}
-
-input SectionUpdateOneInlineInput {
-    "Connect existing Section document"
-    connect: SectionWhereUniqueInput
-    "Create and connect one Section document"
-    create: SectionCreateInput
-    "Delete currently connected Section document"
-    delete: Boolean
-    "Disconnect currently connected Section document"
-    disconnect: Boolean
-    "Update single Section document"
-    update: SectionUpdateWithNestedWhereUniqueInput
-    "Upsert single Section document"
-    upsert: SectionUpsertWithNestedWhereUniqueInput
-}
-
-input SectionUpdateWithNestedWhereUniqueInput {
-    "Document to update"
-    data: SectionUpdateInput!
-    "Unique document search"
-    where: SectionWhereUniqueInput!
-}
-
-input SectionUpsertInput {
-    "Create document if it didn't exist"
-    create: SectionCreateInput!
-    "Update document if it exists"
-    update: SectionUpdateInput!
-}
-
-input SectionUpsertWithNestedWhereUniqueInput {
-    "Upsert data"
-    data: SectionUpsertInput!
-    "Unique document search"
-    where: SectionWhereUniqueInput!
-}
-
-"This contains a set of filters that can be used to compare values internally"
-input SectionWhereComparatorInput {
-    "This field can be used to request to check if the entry is outdated by internal comparison"
-    outdated_to: Boolean
-}
-
-"Identifies documents"
-input SectionWhereInput {
-    "Logical AND on all given filters."
-    AND: [SectionWhereInput!]
-    "Logical NOT on all given filters combined by AND."
-    NOT: [SectionWhereInput!]
-    "Logical OR on all given filters."
-    OR: [SectionWhereInput!]
-    "Contains search across all appropriate fields."
-    _search: String
-    createdAt: DateTime
-    "All values greater than the given value."
-    createdAt_gt: DateTime
-    "All values greater than or equal the given value."
-    createdAt_gte: DateTime
-    "All values that are contained in given list."
-    createdAt_in: [DateTime]
-    "All values less than the given value."
-    createdAt_lt: DateTime
-    "All values less than or equal the given value."
-    createdAt_lte: DateTime
-    "All values that are not equal to given value."
-    createdAt_not: DateTime
-    "All values that are not contained in given list."
-    createdAt_not_in: [DateTime]
-    createdBy: UserWhereInput
-    documentInStages_every: SectionWhereStageInput
-    documentInStages_none: SectionWhereStageInput
-    documentInStages_some: SectionWhereStageInput
-    files_every: FileWhereInput
-    files_none: FileWhereInput
-    files_some: FileWhereInput
-    id: ID
-    "All values containing the given string."
-    id_contains: ID
-    "All values ending with the given string."
-    id_ends_with: ID
-    "All values that are contained in given list."
-    id_in: [ID]
-    "All values that are not equal to given value."
-    id_not: ID
-    "All values not containing the given string."
-    id_not_contains: ID
-    "All values not ending with the given string"
-    id_not_ends_with: ID
-    "All values that are not contained in given list."
-    id_not_in: [ID]
-    "All values not starting with the given string."
-    id_not_starts_with: ID
-    "All values starting with the given string."
-    id_starts_with: ID
-    name: String
-    "All values containing the given string."
-    name_contains: String
-    "All values ending with the given string."
-    name_ends_with: String
-    "All values that are contained in given list."
-    name_in: [String]
-    "All values that are not equal to given value."
-    name_not: String
-    "All values not containing the given string."
-    name_not_contains: String
-    "All values not ending with the given string"
-    name_not_ends_with: String
-    "All values that are not contained in given list."
-    name_not_in: [String]
-    "All values not starting with the given string."
-    name_not_starts_with: String
-    "All values starting with the given string."
-    name_starts_with: String
-    posts_every: PostWhereInput
-    posts_none: PostWhereInput
-    posts_some: PostWhereInput
-    publishedAt: DateTime
-    "All values greater than the given value."
-    publishedAt_gt: DateTime
-    "All values greater than or equal the given value."
-    publishedAt_gte: DateTime
-    "All values that are contained in given list."
-    publishedAt_in: [DateTime]
-    "All values less than the given value."
-    publishedAt_lt: DateTime
-    "All values less than or equal the given value."
-    publishedAt_lte: DateTime
-    "All values that are not equal to given value."
-    publishedAt_not: DateTime
-    "All values that are not contained in given list."
-    publishedAt_not_in: [DateTime]
-    publishedBy: UserWhereInput
-    scheduledIn_every: ScheduledOperationWhereInput
-    scheduledIn_none: ScheduledOperationWhereInput
-    scheduledIn_some: ScheduledOperationWhereInput
-    slug: String
-    "All values containing the given string."
-    slug_contains: String
-    "All values ending with the given string."
-    slug_ends_with: String
-    "All values that are contained in given list."
-    slug_in: [String]
-    "All values that are not equal to given value."
-    slug_not: String
-    "All values not containing the given string."
-    slug_not_contains: String
-    "All values not ending with the given string"
-    slug_not_ends_with: String
-    "All values that are not contained in given list."
-    slug_not_in: [String]
-    "All values not starting with the given string."
-    slug_not_starts_with: String
-    "All values starting with the given string."
-    slug_starts_with: String
-    updatedAt: DateTime
-    "All values greater than the given value."
-    updatedAt_gt: DateTime
-    "All values greater than or equal the given value."
-    updatedAt_gte: DateTime
-    "All values that are contained in given list."
-    updatedAt_in: [DateTime]
-    "All values less than the given value."
-    updatedAt_lt: DateTime
-    "All values less than or equal the given value."
-    updatedAt_lte: DateTime
-    "All values that are not equal to given value."
-    updatedAt_not: DateTime
-    "All values that are not contained in given list."
-    updatedAt_not_in: [DateTime]
-    updatedBy: UserWhereInput
-}
-
-"The document in stages filter allows specifying a stage entry to cross compare the same document between different stages"
-input SectionWhereStageInput {
-    "Logical AND on all given filters."
-    AND: [SectionWhereStageInput!]
-    "Logical NOT on all given filters combined by AND."
-    NOT: [SectionWhereStageInput!]
-    "Logical OR on all given filters."
-    OR: [SectionWhereStageInput!]
-    "This field contains fields which can be set as true or false to specify an internal comparison"
-    compareWithParent: SectionWhereComparatorInput
-    "Specify the stage to compare with"
-    stage: Stage
-}
-
-"References Section record uniquely"
-input SectionWhereUniqueInput {
-    id: ID
-    slug: String
 }
 
 input SubCategoryConnectInput {

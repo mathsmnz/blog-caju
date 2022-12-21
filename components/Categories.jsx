@@ -1,6 +1,7 @@
-import React, {useState, useEffect} from 'react'
+import React, {useEffect, useState} from 'react'
 import Link from 'next/link'
 import {getCategories} from "../services";
+
 const Categories = () => {
     const [categories, setCategories] = useState([]);
     useEffect(() => {
@@ -9,7 +10,7 @@ const Categories = () => {
         });
     }, []);
     return (
-        <div className="bg-white shadow-lg rounded-lg p-8 mb-8">
+        <div className="p-8 mb-8">
             <h3 className="text-xl mb-8 font-semibold border-b pb-4">
                 Categories
             </h3>
